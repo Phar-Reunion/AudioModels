@@ -3,10 +3,10 @@ import tensorflow
 import numpy
 
 class MusicAnalyzer(tensorflow.keras.Sequential):
-    def __init__(self, nclasses, input_shape):
+    def __init__(self, nclasses, input_shape=()):
         super(MusicAnalyzer, self).__init__()
 
-        self.add(tensorflow.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+        self.add(tensorflow.keras.layers.Conv2D(32, (3, 3), activation='relu'))#, input_shape=input_shape))
         self.add(tensorflow.keras.layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
         self.add(tensorflow.keras.layers.BatchNormalization())
 
@@ -26,46 +26,56 @@ class MusicAnalyzer(tensorflow.keras.Sequential):
 
         self.valid_extensions = ['.ogg', '.wav']
 
-def load_mfcc(path, n_seconds=-1):
+def load_mfccs_and_reshape(path, n_seconds):
+    mfccs = []
     y, sr = librosa.load(path)
-    if n_seconds > 0:
-        y = y[:sr * n_seconds]
-    mfcc = librosa.feature.mfcc(y=y, sr=sr)
-    return mfcc, sr
-
-def load_mfcc_and_reshape(path, n_seconds=-1):
-    mfcc, sr = load_mfcc(path, n_seconds)
-    mfcc = numpy.reshape(mfcc, (1, mfcc.shape[0], mfcc.shape[1], 1))
-    return mfcc
+    while len(y) > sr * n_seconds:
+        mfcc = librosa.feature.mfcc(y=y[:sr * n_seconds], sr=sr)
+        mfcc = numpy.reshape(mfcc, (1, mfcc.shape[0], mfcc.shape[1], 1))
+        mfccs.append(mfcc)
+        y = y[sr * n_seconds:]
+        del mfcc
+    return mfccs
 
 if __name__ == '__main__':
     import os
 
-    genres = ['rock', 'pop', 'shatta', 'zouk', 'classic']
-    sec = 60
+    genres = ['disco', 'jazz', 'rock', 'pop', 'blues', 'reggae', 'hiphop', 'metal', 'classical', 'country']
+    sec = 30
     epochs = 30
 
-    ma = MusicAnalyzer(len(genres))
-    ma.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    print(genres)
 
-    for i, genre in enumerate(genres):
-        print("Genre: " + genre)
-        for file in os.listdir(genre):
-            for ext in ma.valid_extensions:
-                if file.endswith(ext):
-                    print(f'Loading {file}...')
-                    mfcc = load_mfcc_and_reshape(os.path.join(genre, file), sec)
-                    ma.fit(mfcc, numpy.array([i]), epochs=epochs) # numpy.array([i]) is the label for the genre but it does not work as the always returned label is the last one
-                    break
+    def train_model(sec, epochs, genres):
+        ma = MusicAnalyzer(len(genres))
+        ma.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    def print_genre(result, genres):
-        print(result)
+        for i, genre in enumerate(genres):
+            print("Genre: " + genre)
+            for file in os.listdir(genre):
+                for ext in ma.valid_extensions:
+                    if file.endswith(ext):
+                        print(f'Loading {file}...')
+                        mfccs = load_mfccs_and_reshape(os.path.join(genre, file), sec)
+                        print(f'Loaded {len(mfccs)} samples')
+                        for mfcc in mfccs:
+                            ma.fit(mfcc, numpy.array([i]), epochs=epochs)
+                        break
+        ma.save('model2.h5')
 
-    #ma.save('model.h5')
+    def predict(ma, files, sec):
+        def print_genre(result, genres):
+            print(f'Raw result: {result}')
+            print(f'Raw genres: {genres}')
+            for i, genre in enumerate(genres):
+                print(f'{genre}: {result[0][i] * 100}%')
 
-    print("Results: ")
-    for song in ["../skylar.wav"]:
-        result = ma.predict(load_mfcc_and_reshape(song, sec))
-        print(f'File: {song}')
-        print_genre(result, genres)
-        print("====================================")
+        print("Results: ")
+        for song in files:
+            for i, mfcc in enumerate(load_mfccs_and_reshape(song, sec)):
+                result = ma.predict(mfcc)
+                print(f'File: {song} part {i}')
+                print_genre(result, genres)
+                print("====================================")
+    print(result.summary())
+    predict(result, ['./touhou.ogg'], sec)
