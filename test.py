@@ -2,20 +2,29 @@ import librosa
 import tensorflow
 import numpy
 
-class MusicAnalyzer(tensorflow.keras.Model):
-    def __init__(self, nclasses):
+class MusicAnalyzer(tensorflow.keras.Sequential):
+    def __init__(self, nclasses, input_shape):
         super(MusicAnalyzer, self).__init__()
-        self.conv1 = tensorflow.keras.layers.Conv2D(32, 3, activation='relu')
-        self.flatten = tensorflow.keras.layers.Flatten()
-        self.d1 = tensorflow.keras.layers.Dense(128, activation='relu')
-        self.d2 = tensorflow.keras.layers.Dense(nclasses, activation='softmax')
-        self.valid_extensions = ['.ogg', '.wav']
 
-    def call(self, x):
-        x = self.conv1(x)
-        x = self.flatten(x)
-        x = self.d1(x)
-        return self.d2(x)
+        self.add(tensorflow.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+        self.add(tensorflow.keras.layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
+        self.add(tensorflow.keras.layers.BatchNormalization())
+
+        self.add(tensorflow.keras.layers.Conv2D(32, (3, 3), activation='relu'))
+        self.add(tensorflow.keras.layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
+        self.add(tensorflow.keras.layers.BatchNormalization())
+
+        self.add(tensorflow.keras.layers.Conv2D(32, (2, 2), activation='relu'))
+        self.add(tensorflow.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'))
+        self.add(tensorflow.keras.layers.BatchNormalization())
+
+        self.add(tensorflow.keras.layers.Flatten())
+        self.add(tensorflow.keras.layers.Dense(64, activation='relu'))
+        self.add(tensorflow.keras.layers.Dropout(0.3))
+
+        self.add(tensorflow.keras.layers.Dense(nclasses, activation='softmax'))
+
+        self.valid_extensions = ['.ogg', '.wav']
 
 def load_mfcc(path, n_seconds=-1):
     y, sr = librosa.load(path)
@@ -31,7 +40,6 @@ def load_mfcc_and_reshape(path, n_seconds=-1):
 
 if __name__ == '__main__':
     import os
-
 
     genres = ['rock', 'pop', 'shatta', 'zouk', 'classic']
     sec = 60
