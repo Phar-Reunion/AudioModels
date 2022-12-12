@@ -17,9 +17,11 @@ def load_mfccs_and_reshape(path, n_seconds):
 if __name__ == '__main__':
     import os
 
-    genres = ['classic', 'rock', 'pop', None]
-    sec = 10
-    epochs = 120
+    genres = ['blues', 'classical', 'country',
+              'disco', 'hiphop', 'jazz',
+              'metal', 'pop', 'reggae', 'rock']
+    sec = 5
+    epochs = 100
 
     print(genres)
     def train_model(sec, epochs, genres):
@@ -41,14 +43,12 @@ if __name__ == '__main__':
         ma.add(tensorflow.keras.layers.Dense(64, activation='relu'))
         ma.add(tensorflow.keras.layers.Dropout(0.3))
 
-        for i in range(5):
+        for i in range(3):
             ma.add(tensorflow.keras.layers.Dense(len(genres), activation='softmax'))
 
         ma.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
         for i, genre in enumerate(genres):
-            if genre is None:
-                continue
             print("Genre: " + genre)
             for file in os.listdir(genre):
                 for ext in ['.ogg', '.wav']:
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                         for mfcc in mfccs:
                             ma.fit(mfcc, numpy.array([i]), epochs=epochs)
                         break
-        ma.save('model.h5')
+        ma.save(f'model-{"-".join(genres)}-{sec}-sec-{epochs}-epochs.phar')
         return ma
 
     def predict(ma, files, sec):
@@ -78,5 +78,6 @@ if __name__ == '__main__':
                 print("====================================")
 
     result = train_model(sec, epochs, genres)
+    #result = tensorflow.keras.models.load_model('./model.h5')
     print(result.summary())
-    predict(result, ['./acdc.wav'], sec)
+    predict(result, ['acdc.wav', 'one-love.ogg', 'amstrong.ogg'], sec)
